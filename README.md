@@ -16,8 +16,8 @@ opencode's API cannot be called from a web page:
 | `GET /models` | 200 with `ACAO: *` | **no** `Access-Control-Allow-Origin` |
 
 A browser enforces CORS against the *response* headers, so it discards replies that lack
-them. No client SDK changes this — any library sending the same request is blocked the same
-way. This proxy sits in front and supplies what is missing.
+them. No client SDK changes this, because any library sending the same request is blocked
+the same way. This proxy sits in front and supplies what is missing.
 
 It also handles two protocol requirements that are easy to miss:
 
@@ -51,7 +51,7 @@ Point your app's API base URL at the proxy instead of `https://opencode.ai/zen/g
 6. Attach your domain. EasyPanel routes to the container and terminates TLS in front of it,
    so the proxy itself only ever speaks plain HTTP inside the network.
 
-Do **not** publish a host port on EasyPanel — the platform handles routing. The port
+Do **not** publish a host port on EasyPanel, since the platform handles routing. The port
 mapping in `compose.yml` is for local use only.
 
 Health check path: `/healthz` (unauthenticated, no API key needed).
@@ -61,8 +61,8 @@ Health check path: `/healthz` (unauthenticated, no API key needed).
 Proxied DNS (orange cloud) gives you TLS at the edge. Two things are worth knowing:
 
 - **Streaming.** Token streaming arrives as `text/event-stream`, and a reverse proxy will
-  buffer that into one lump unless told otherwise — turning a live stream into a long
-  silence then a wall of text. The proxy sets `cache-control: no-cache, no-transform` and
+  buffer that into one lump unless told otherwise, turning a live stream into a long
+  silence followed by a wall of text. The proxy sets `cache-control: no-cache, no-transform` and
   `x-accel-buffering: no` on streamed responses to prevent that.
 - **The 100-second limit.** Cloudflare's free plan drops a connection after 100s with a
   524. A long non-streamed completion can exceed that. Send `stream: true` and the first
@@ -129,7 +129,7 @@ sends their own and it is forwarded upstream as-is.
 ### Securing a public deployment
 
 A CORS proxy on a public host is an **open relay** by default: any website can point at it.
-A caller still needs their own opencode key, so nobody spends *your* quota — but your host
+A caller still needs their own opencode key, so nobody spends *your* quota, but your host
 carries the traffic and your IP wears the reputation. Before exposing it:
 
 - Set `ALLOWED_ORIGINS` to the exact origins of your app. Not `*`.
@@ -152,8 +152,8 @@ npm test            # 22 tests against a mock upstream, no API key needed
 npm run test:docker # 6 tests against the built image, including a live opencode call
 ```
 
-The mock upstream in `test/mock-upstream.mjs` reproduces the two behaviours that matter —
-rejecting a missing session header, and streaming SSE — so the whole chain is covered
+The mock upstream in `test/mock-upstream.mjs` reproduces the two behaviours that matter -
+rejecting a missing session header, and streaming SSE, so the whole chain is covered
 without a key or a network round trip. The Docker suite spawns the real image, checks the
 origin allowlist, token gate, preflight and shutdown behaviour, and confirms a real call to
 opencode comes back carrying the CORS header upstream never sends.
