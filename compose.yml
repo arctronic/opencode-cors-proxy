@@ -1,0 +1,29 @@
+services:
+  opencode-cors-proxy:
+    build: .
+    image: opencode-cors-proxy
+    container_name: opencode-cors-proxy
+    restart: unless-stopped
+    ports:
+      # Local default binds loopback. On EasyPanel you do not publish a port at all -
+      # the platform routes to the container and terminates TLS in front of it.
+      - "127.0.0.1:8787:8787"
+    environment:
+      UPSTREAM: https://opencode.ai/zen/go/v1
+      # Comma-separated. Leave as * only for local use.
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+      # Set this on any public deployment or the proxy is an open relay.
+      PROXY_TOKEN: ${PROXY_TOKEN:-}
+      RATE_LIMIT: ${RATE_LIMIT:-60}
+      RATE_WINDOW_MS: ${RATE_WINDOW_MS:-60000}
+      MAX_BODY_BYTES: ${MAX_BODY_BYTES:-1000000}
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"

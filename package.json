@@ -1,0 +1,17 @@
+{
+  "name": "opencode-cors-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CORS proxy for the opencode Zen API, so browser pages can call it",
+  "type": "module",
+  "main": "server.mjs",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/proxy.test.mjs",
+    "test:docker": "node --test test/docker.test.mjs",
+    "docker:build": "docker compose build"
+  }
+}
