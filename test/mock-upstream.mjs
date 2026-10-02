@@ -21,7 +21,7 @@ export function createMockUpstream() {
         body
       });
 
-      if (!req.headers.authorization) {
+      if (!req.headers.authorization && !req.headers['x-api-key']) {
         res.writeHead(401, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ error: { message: 'Invalid API key.' } }));
         return;
@@ -32,6 +32,18 @@ export function createMockUpstream() {
         res.writeHead(400, { 'content-type': 'application/json' });
         res.end(JSON.stringify({
           error: { message: 'Request is missing x-opencode-session and cannot be routed efficiently.' }
+        }));
+        return;
+      }
+
+      // Anthropic-shaped endpoint, which is what Claude Code speaks.
+      if (req.url.startsWith('/messages')) {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({
+          id: 'msg_mock', type: 'message', role: 'assistant', model: 'mock',
+          stop_reason: 'end_turn',
+          content: [{ type: 'text', text: 'OK' }],
+          usage: { input_tokens: 5, output_tokens: 1 }
         }));
         return;
       }

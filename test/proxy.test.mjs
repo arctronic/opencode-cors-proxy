@@ -239,6 +239,52 @@ test('rate limiting keys on CF-Connecting-IP so one visitor cannot spend everyon
   assert.equal((await call('2.2.2.2')).status, 200, 'a different visitor must be unaffected');
 });
 
+/* ----------------------------------------------------- anthropic / claude code */
+
+test('x-api-key is accepted and forwarded, so Claude Code can authenticate', async () => {
+  const { base } = await startProxy();
+  const res = await fetch(base + '/messages', {
+    method: 'POST',
+    headers: { 'x-api-key': 'oc_sk_anthropic_style', 'content-type': 'application/json',
+               'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: 'm', max_tokens: 10, messages: [{ role: 'user', content: 'hi' }] })
+  });
+  assert.equal(res.status, 200);
+  const seen = mock.seen.at(-1);
+  assert.equal(seen.headers['x-api-key'], 'oc_sk_anthropic_style');
+  assert.equal(seen.headers['anthropic-version'], '2023-06-01');
+});
+
+test('the session header is supplied on /messages too (Claude Code never sends one)', async () => {
+  const { base } = await startProxy();
+  const res = await fetch(base + '/messages', {
+    method: 'POST',
+    headers: { 'x-api-key': 'k', 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'm', max_tokens: 10, messages: [{ role: 'user', content: 'hi' }] })
+  });
+  assert.equal(res.status, 200, 'upstream 400s without a session id');
+  assert.ok(mock.seen.at(-1).headers['x-opencode-session']);
+});
+
+test('a request with neither credential header is rejected', async () => {
+  const { base } = await startProxy();
+  const before = mock.seen.length;
+  const res = await fetch(base + '/messages', { method: 'POST' });
+  assert.equal(res.status, 401);
+  assert.equal(mock.seen.length, before);
+});
+
+test('preflight advertises the Anthropic headers', async () => {
+  const { base } = await startProxy();
+  const res = await fetch(base + '/messages', {
+    method: 'OPTIONS',
+    headers: { origin: 'https://x.example', 'access-control-request-method': 'POST' }
+  });
+  const allowed = res.headers.get('access-control-allow-headers').toLowerCase();
+  assert.ok(allowed.includes('x-api-key'));
+  assert.ok(allowed.includes('anthropic-version'));
+});
+
 /* -------------------------------------------------------------------- hygiene */
 
 test('the proxy never logs the Authorization header', async () => {

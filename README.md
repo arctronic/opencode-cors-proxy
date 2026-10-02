@@ -1,7 +1,10 @@
 # opencode-cors-proxy
 
-A small CORS proxy for the [opencode Zen API](https://opencode.ai/docs/go/), so a browser
-page can call it.
+A small proxy for the [opencode Zen API](https://opencode.ai/docs/go/).
+
+It does two jobs: it makes opencode callable from a **browser page** (which CORS otherwise
+forbids), and it makes opencode usable from **Claude Code** (which cannot send the
+conversation-id header opencode requires).
 
 ## Why this exists
 
@@ -69,6 +72,40 @@ Rate limiting uses `CF-Connecting-IP`, which Cloudflare sets itself, so one visi
 spend everyone else's allowance. Lock your origin to Cloudflare IPs so that header cannot
 be forged.
 
+## Use it from Claude Code
+
+Claude Code speaks the Anthropic Messages API, and opencode serves that natively at
+`/zen/go/v1/messages` - so no format translation is needed. The one blocker is that opencode
+rejects any request without `x-opencode-session`, and Claude Code does not send one. Pointing
+Claude Code at this proxy fixes that, because the proxy supplies the header.
+
+```powershell
+$env:ANTHROPIC_BASE_URL = "http://127.0.0.1:8787"   # or your deployed proxy URL
+$env:ANTHROPIC_API_KEY  = "oc_sk_your_key"
+$env:ANTHROPIC_MODEL    = "kimi-k3"
+```
+
+`ANTHROPIC_BASE_URL` omits `/v1` - the client appends `/v1/messages` itself.
+
+Use `ANTHROPIC_API_KEY`, not `ANTHROPIC_AUTH_TOKEN`: that endpoint authenticates with
+`x-api-key`, and `Authorization: Bearer` returns `Missing API key`. The proxy accepts either
+and forwards whichever you sent.
+
+Verified working with tool calling, which Claude Code depends on:
+
+```
+model: kimi-k3   stop_reason: tool_use   read_file {"path": "/etc/hosts"}
+```
+
+Caveats worth knowing:
+
+- **Not every model speaks the Anthropic protocol.** `glm-5.3` returns
+  `ModelProtocolUnsupported` on `/messages` while working fine on `/chat/completions`.
+  Confirmed working: `kimi-k3`, `deepseek-v4-pro`, `space-bunny-free`.
+- **This is unsupported territory.** Pointing Claude Code at a non-Anthropic backend is not
+  an official configuration - Bedrock and Vertex are. Expect rough edges around prompt
+  caching, long context and newer features, and check it is within your opencode plan terms.
+
 ## Configuration
 
 | Variable | Default | What it does |
@@ -83,7 +120,11 @@ be forged.
 | `MAX_BODY_BYTES` | `1000000` | Largest accepted request body. |
 | `USER_AGENT` | `opencode-cors-proxy/1.0` | Sent upstream. |
 
-Copy `.env.example` to `.env` to set these locally.
+Copy `.env.example` to `.env.local` (or `.env`) to set these locally. Both are gitignored;
+only `.env.example` is committed.
+
+Your opencode API key does **not** go in any of them - the proxy stores no key. Each caller
+sends their own and it is forwarded upstream as-is.
 
 ### Securing a public deployment
 
@@ -107,7 +148,7 @@ returns 404, so the proxy cannot be used to reach arbitrary upstream paths.
 ## Tests
 
 ```bash
-npm test            # 18 unit/integration tests against a mock upstream, no API key needed
+npm test            # 22 tests against a mock upstream, no API key needed
 npm run test:docker # 6 tests against the built image, including a live opencode call
 ```
 

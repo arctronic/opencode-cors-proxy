@@ -46,7 +46,8 @@ function corsHeaders(origin) {
   return {
     'Access-Control-Allow-Origin': origin || '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Opencode-Session, X-Proxy-Token',
+    'Access-Control-Allow-Headers':
+      'Authorization, X-Api-Key, Anthropic-Version, Content-Type, X-Opencode-Session, X-Proxy-Token',
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin'
   };
@@ -161,17 +162,28 @@ export function createProxyServer() {
       return;
     }
 
-    if (!req.headers.authorization) {
-      sendJson(res, 401, cors, { error: { message: 'Missing Authorization header.' } });
+    /* Two call shapes reach the same upstream:
+         - OpenAI style (/chat/completions, /models) authenticates with Authorization: Bearer
+         - Anthropic style (/messages), which Claude Code speaks, uses x-api-key
+       Accept whichever the caller sent and pass it through untouched. */
+    const bearer = req.headers.authorization;
+    const apiKey = req.headers['x-api-key'];
+    if (!bearer && !apiKey) {
+      sendJson(res, 401, cors, {
+        error: { message: 'Missing credentials. Send Authorization: Bearer <key> or x-api-key: <key>.' }
+      });
       return;
     }
 
     const headers = {
       'user-agent': USER_AGENT,
-      authorization: req.headers.authorization,
-      // opencode routes and caches per conversation and 400s without this.
+      // opencode routes and caches per conversation and 400s without this. Claude Code
+      // does not send it, so supplying it here is what makes that client work at all.
       'x-opencode-session': req.headers['x-opencode-session'] || FALLBACK_SESSION
     };
+    if (bearer) headers.authorization = bearer;
+    if (apiKey) headers['x-api-key'] = apiKey;
+    if (req.headers['anthropic-version']) headers['anthropic-version'] = req.headers['anthropic-version'];
     if (req.headers['content-type']) headers['content-type'] = req.headers['content-type'];
     if (req.headers.accept) headers.accept = req.headers.accept;
 
