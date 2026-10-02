@@ -32,6 +32,13 @@ const MAX_BODY_BYTES = Number(process.env.MAX_BODY_BYTES || 1_000_000);
 
 const ALLOWED_PATHS = /^\/(chat\/completions|models|responses|messages)(\?.*)?$/;
 
+/* Some clients probe the base URL to discover an endpoint. Upstream serves its marketing
+   site there, which is useless to them, so treat a bare root as a request for the model
+   list - the OpenAI-compatible way to enumerate an endpoint. */
+function normalisePath(path) {
+  return path === '/' || path === '' ? '/models' : path;
+}
+
 /* ------------------------------------------------------------------ helpers */
 
 function originAllowed(origin) {
@@ -114,9 +121,11 @@ function readBody(req, limit) {
   });
 }
 
-function sendJson(res, status, headers, payload) {
+function sendJson(res, status, headers, payload, req) {
   res.writeHead(status, { ...headers, 'content-type': 'application/json' });
   res.end(JSON.stringify(payload));
+  // Rejections used to be silent, which made client-side failures invisible here.
+  if (req) console.log(req.method, req.url, '->', status, '(rejected)');
 }
 
 /* Fallback so a caller that omits a conversation id is not rejected upstream. */
@@ -136,7 +145,7 @@ export function createProxyServer() {
     }
 
     if (!originAllowed(origin)) {
-      sendJson(res, 403, {}, { error: { message: 'Origin not allowed: ' + (origin || '(none)') } });
+      sendJson(res, 403, {}, { error: { message: 'Origin not allowed: ' + (origin || '(none)') } }, req);
       return;
     }
 
@@ -147,18 +156,18 @@ export function createProxyServer() {
     }
 
     if (PROXY_TOKEN && req.headers['x-proxy-token'] !== PROXY_TOKEN) {
-      sendJson(res, 401, cors, { error: { message: 'Missing or invalid x-proxy-token.' } });
+      sendJson(res, 401, cors, { error: { message: 'Missing or invalid x-proxy-token.' } }, req);
       return;
     }
 
-    const path = req.url || '/';
+    const path = normalisePath(req.url || '/');
     if (!ALLOWED_PATHS.test(path)) {
-      sendJson(res, 404, cors, { error: { message: 'Not a proxied path: ' + path } });
+      sendJson(res, 404, cors, { error: { message: 'Not a proxied path: ' + path } }, req);
       return;
     }
 
     if (rateLimited(clientIp(req))) {
-      sendJson(res, 429, cors, { error: { message: 'Rate limit exceeded. Try again shortly.' } });
+      sendJson(res, 429, cors, { error: { message: 'Rate limit exceeded. Try again shortly.' } }, req);
       return;
     }
 
@@ -171,7 +180,7 @@ export function createProxyServer() {
     if (!bearer && !apiKey) {
       sendJson(res, 401, cors, {
         error: { message: 'Missing credentials. Send Authorization: Bearer <key> or x-api-key: <key>.' }
-      });
+      }, req);
       return;
     }
 

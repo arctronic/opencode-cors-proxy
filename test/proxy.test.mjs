@@ -285,6 +285,24 @@ test('preflight advertises the Anthropic headers', async () => {
   assert.ok(allowed.includes('anthropic-version'));
 });
 
+test('a root probe is answered with the model list, not a 404', async () => {
+  const { base } = await startProxy();
+  const res = await fetch(base + '/', { headers: { authorization: 'Bearer k' } });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.ok(Array.isArray(body.data), 'root should return an OpenAI-style model list');
+  assert.equal(mock.seen.at(-1).url, '/models', 'upstream should receive /models');
+});
+
+test('rejections are logged so a client failure is visible in the proxy output', async () => {
+  const { child, base } = await startProxy({ ALLOWED_ORIGINS: 'https://only.example' });
+  let output = '';
+  child.stdout.on('data', (b) => { output += b.toString(); });
+  await fetch(base + '/models', { headers: { origin: 'https://other.example', authorization: 'Bearer k' } });
+  await new Promise((r) => setTimeout(r, 300));
+  assert.match(output, /rejected/);
+});
+
 /* -------------------------------------------------------------------- hygiene */
 
 test('the proxy never logs the Authorization header', async () => {
