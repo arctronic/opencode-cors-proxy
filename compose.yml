@@ -8,11 +8,15 @@ services:
       # Local default binds loopback. On EasyPanel you do not publish a port at all -
       # the platform routes to the container and terminates TLS in front of it.
       - "127.0.0.1:8787:8787"
+    # Runtime settings come from .env.local when present. It is gitignored, so local
+    # values never reach the repo. Missing file is fine - the defaults below apply.
+    env_file:
+      - path: .env.local
+        required: false
     environment:
-      UPSTREAM: https://opencode.ai/zen/go/v1
-      # Comma-separated. Leave as * only for local use.
+      # Defaults, overridden by anything set in .env.local above.
+      UPSTREAM: ${UPSTREAM:-https://opencode.ai/zen/go/v1}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
-      # Set this on any public deployment or the proxy is an open relay.
       PROXY_TOKEN: ${PROXY_TOKEN:-}
       RATE_LIMIT: ${RATE_LIMIT:-60}
       RATE_WINDOW_MS: ${RATE_WINDOW_MS:-60000}
