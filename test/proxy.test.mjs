@@ -215,6 +215,17 @@ test('an oversized body is refused', async () => {
   assert.match(body.error.message, /too large/i);
 });
 
+test('an agent-sized body passes under the default limit', async () => {
+  const { base } = await startProxy();  // no MAX_BODY_BYTES override: exercise the default
+  const big = 'x'.repeat(3_000_000);    // 3 MB, well over the old 1 MB cap
+  const res = await fetch(base + '/chat/completions', {
+    method: 'POST',
+    headers: { authorization: 'Bearer k', 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'm', messages: [{ role: 'user', content: big }] })
+  });
+  assert.equal(res.status, 200, 'a multi-MB agent request must not be rejected');
+});
+
 test('the rate limit returns 429 once the window is spent', async () => {
   const { base } = await startProxy({ RATE_LIMIT: '3', RATE_WINDOW_MS: '60000' });
   const codes = [];

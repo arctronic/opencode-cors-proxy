@@ -13,14 +13,9 @@ services:
     env_file:
       - path: .env.local
         required: false
-    environment:
-      # Defaults, overridden by anything set in .env.local above.
-      UPSTREAM: ${UPSTREAM:-https://opencode.ai/zen/go/v1}
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
-      PROXY_TOKEN: ${PROXY_TOKEN:-}
-      RATE_LIMIT: ${RATE_LIMIT:-60}
-      RATE_WINDOW_MS: ${RATE_WINDOW_MS:-60000}
-      MAX_BODY_BYTES: ${MAX_BODY_BYTES:-1000000}
+    # No environment: block here on purpose. Compose gives `environment` precedence
+    # over `env_file`, so restating these would silently shadow .env.local. The
+    # defaults live in server.mjs; .env.local overrides them.
     read_only: true
     security_opt:
       - no-new-privileges:true

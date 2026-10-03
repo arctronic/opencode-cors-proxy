@@ -28,7 +28,10 @@ const PROXY_TOKEN = process.env.PROXY_TOKEN || '';
 
 const RATE_LIMIT = Number(process.env.RATE_LIMIT || 60);      // requests per window, per IP
 const RATE_WINDOW_MS = Number(process.env.RATE_WINDOW_MS || 60_000);
-const MAX_BODY_BYTES = Number(process.env.MAX_BODY_BYTES || 1_000_000);
+/* 1 MB was enough for a browser chat but far too small for a coding agent: a
+   1M-token context is roughly 4 MB of text before JSON overhead, and tool output
+   and file contents push it higher. 32 MB is still a bound, not an invitation. */
+const MAX_BODY_BYTES = Number(process.env.MAX_BODY_BYTES || 32_000_000);
 
 const ALLOWED_PATHS = /^\/(chat\/completions|models|responses|messages)(\?.*)?$/;
 
